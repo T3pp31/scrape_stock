@@ -1,33 +1,36 @@
 use anyhow::Result;
 use reqwest::blocking;
 use scraper::{Html, Selector};
-use std::fs::{create_dir_all, remove_file, File};
+use std::fs::{self, create_dir_all, remove_file, File};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::{self, Path};
 use xcss::xcss::xcss;
 
 const URL: &str = "https://kabutan.jp/stock/?code=";
+const BOM: &[u8; 3] = &[0xEF, 0xBB, 0xBF]; // UTF-8
 
 fn main() {
     //ファイルパスの指定
     let path = Path::new("output");
 
     let test_path = Path::new("output/output.csv");
+    remove_file(path);
 
-    //ファイルを開いたことがなかったらfirst_openを実行
+    let writer_result = first_open(path);
+    let mut writer = match writer_result {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("Error opening file: {}", e);
+            return;
+        }
+    };
 
-    //ファイルが存在するかを調べる.ファイルが存在すると上書き保存がうまくいかないので，一度削除してから作成
+    //let stock_ids = read_stock_id().expect("Failed to read input.txt");
+    let stock_ids = vec![
+        "2914", "4502", "5020", "8306", "8593", "8766", "9432", "9433", "7164", "8566", "8058",
+        "5021",
+    ];
 
-    let mut writer = if !Path::is_file(test_path) {
-        first_open(path)
-    } else {
-        remove_file(test_path);
-        first_open(path);
-        open_csv(path)
-    }
-    .unwrap();
-
-    let stock_ids = read_stock_id().expect("Failed to read input.txt");
     for stock_id in stock_ids {
         let document = search_stock(&stock_id).expect("Failed to fetch stock information");
         let stock_name = get_stock_info(&document, "//*[@id='stockinfo_i1']/div[1]/h2")
@@ -149,11 +152,27 @@ fn open_csv(output_dir: &Path) -> Result<BufWriter<File>, std::io::Error> {
 }
 
 fn first_open(path: &Path) -> Result<BufWriter<File>, std::io::Error> {
-    let mut writer = open_csv(path)?;
+    // ディレクトリが存在する場合は削除します。
+    if path.exists() {
+        fs::remove_dir_all(path);
+    }
+
+    // 新しいディレクトリを作成します。
+    fs::create_dir_all(path);
+
+    // ファイルを作成または既存のファイルを開きます。
+    let file = File::create(path.join("output.csv"))?;
+
+    // BufWriterを使用してファイルへの書き込みを効率的に行います。
+
+    let mut writer = BufWriter::new(file);
+    writer.write_all(BOM);
+    // ヘッダー行を書き込みます。
     write_to_csv(
         "Stock_ID,Stock_Name,Stock_Price,per,pbr,return_per,1株益,predict_return,amount_return",
         &mut writer,
     );
+
     Ok(writer)
 }
 
