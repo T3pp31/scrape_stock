@@ -101,7 +101,7 @@ fn main() {
             "{},{},{},{},{},{},{},{},{}",
             stock_id,
             stock_name,
-            stock_price,
+            stock_price.replace(",", ""),
             per,
             pbr,
             return_per,
@@ -162,14 +162,14 @@ fn first_open(path: &Path) -> Result<BufWriter<File>, std::io::Error> {
 
     // ファイルを作成または既存のファイルを開きます。
     let file = File::create(path.join("output.csv"))?;
-
+    println!("File opened successfully: {:?}", path);
     // BufWriterを使用してファイルへの書き込みを効率的に行います。
 
     let mut writer = BufWriter::new(file);
     writer.write_all(BOM);
     // ヘッダー行を書き込みます。
     write_to_csv(
-        "Stock_ID,Stock_Name,Stock_Price,per,pbr,return_per,1株益,predict_return,amount_return",
+        "株式番号,会社名,株価,PER,PBR,配当利回り,1株益(EPS),予想配当年,予想配当額",
         &mut writer,
     );
 
