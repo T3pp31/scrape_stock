@@ -25,11 +25,11 @@ fn main() {
         }
     };
 
-    //let stock_ids = read_stock_id().expect("Failed to read input.txt");
-    let stock_ids = vec![
-        "2914", "4502", "5020", "8306", "8593", "8766", "9432", "9433", "7164", "8566", "8058",
-        "5021",
-    ];
+    let stock_ids = read_stock_id("input.txt").expect("Failed to read input.txt");
+    // let stock_ids = vec![
+    //     "2914", "4502", "5020", "8306", "8593", "8766", "9432", "9433", "7164", "8566", "8058",
+    //     "5021",
+    // ];
 
     for stock_id in stock_ids {
         let document = search_stock(&stock_id).expect("Failed to fetch stock information");
@@ -115,12 +115,12 @@ fn main() {
     }
 }
 
-fn read_stock_id() -> Result<Vec<String>, io::Error> {
+fn read_stock_id(path: &str) -> Result<Vec<String>, io::Error> {
     //保存用のリストを作成する
     let mut stock_ids: Vec<String> = Vec::new();
 
     // .txtファイルの中身を1行ずつ取り出す
-    for result in BufReader::new(File::open("input.txt")?).lines() {
+    for result in BufReader::new(File::open(path)?).lines() {
         let line = result?;
         stock_ids.push(line);
     }
