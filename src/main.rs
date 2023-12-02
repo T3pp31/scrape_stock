@@ -1,22 +1,37 @@
 use anyhow::Result;
 use reqwest::blocking;
 use scraper::{Html, Selector};
+use std::env;
 use std::fs::{self, create_dir_all, remove_file, File};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::path::{self, Path};
+use std::path::{self, Path, PathBuf};
+use std::thread::sleep;
+use std::time::Duration;
 use xcss::xcss::xcss;
 
 const URL: &str = "https://kabutan.jp/stock/?code=";
 const BOM: &[u8; 3] = &[0xEF, 0xBB, 0xBF]; // UTF-8
 
 fn main() {
-    //ファイルパスの指定
-    let path = Path::new("output");
+    //カレントディレクトリにあるinput.txtを絶対パスで取るための手法
+    //exeで実行した際に，相対パスだとうまくいかないため，exeを実行した場所の絶対パスを取得し，input.txtを付け足した．
+    let file_path = if let Ok(exe_path) = env::current_exe() {
+        exe_path
+            .parent()
+            .map(|p| p.join("input.txt"))
+            .unwrap_or_else(|| Path::new("input.txt").to_path_buf())
+    } else {
+        eprintln!("Error: Unable to get the current executable path!");
+        return;
+    };
+    println!("File path: {:?}", file_path);
 
-    let test_path = Path::new("output/output.csv");
-    remove_file(path);
+    //出力先のディレクトリを作成する
+    let exe_path = env::current_exe().unwrap().parent().unwrap().join("output");
+    let path = Path::new(exe_path.to_str().unwrap());
+    remove_file(&exe_path);
 
-    let writer_result = first_open(path);
+    let writer_result = first_open(&path);
     let mut writer = match writer_result {
         Ok(w) => w,
         Err(e) => {
@@ -25,7 +40,7 @@ fn main() {
         }
     };
 
-    let stock_ids = read_stock_id("input.txt").expect("Failed to read input.txt");
+    let stock_ids = read_stock_id(&file_path).expect("Failed to read input.txt");
     // let stock_ids = vec![
     //     "2914", "4502", "5020", "8306", "8593", "8766", "9432", "9433", "7164", "8566", "8058",
     //     "5021",
@@ -112,10 +127,14 @@ fn main() {
         .to_string();
 
         write_to_csv(&data, &mut writer);
+
+        //一定時間待機
+        let duration = Duration::from_secs(5);
+        sleep(duration);
     }
 }
 
-fn read_stock_id(path: &str) -> Result<Vec<String>, io::Error> {
+fn read_stock_id(path: &PathBuf) -> Result<Vec<String>, io::Error> {
     //保存用のリストを作成する
     let mut stock_ids: Vec<String> = Vec::new();
 
@@ -141,14 +160,6 @@ fn get_stock_info(document: &Html, x_path: &str) -> Result<String, &'static str>
         .next()
         .map(|data| data.text().collect::<Vec<_>>().join(""))
         .ok_or("Selector not found")
-}
-
-fn open_csv(output_dir: &Path) -> Result<BufWriter<File>, std::io::Error> {
-    create_dir_all(&output_dir)?;
-    let file_path = output_dir.join("output.csv");
-    let file = File::open(&file_path).unwrap_or_else(|_| File::create(&file_path).unwrap());
-    let w = BufWriter::new(file);
-    Ok(w)
 }
 
 fn first_open(path: &Path) -> Result<BufWriter<File>, std::io::Error> {
